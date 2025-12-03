@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import { useEnableComments } from '@/hooks/useEnableComments';
 
 interface DoubanComment {
   id: string;
@@ -17,6 +18,11 @@ interface DoubanCommentsProps {
   doubanId: number;
 }
 
+// 获取运行时配置的类型
+interface RuntimeConfig {
+  EnableComments: boolean;
+}
+
 export default function DoubanComments({ doubanId }: DoubanCommentsProps) {
   const [comments, setComments] = useState<DoubanComment[]>([]);
   const [loading, setLoading] = useState(false);
@@ -25,6 +31,13 @@ export default function DoubanComments({ doubanId }: DoubanCommentsProps) {
   const [hasMore, setHasMore] = useState(false);
   const [hasStartedLoading, setHasStartedLoading] = useState(false);
   const limit = 20;
+
+  const enableComments = useEnableComments();
+
+  // 如果评论功能被禁用，不显示任何内容
+  if (!enableComments) {
+    return null;
+  }
 
   const fetchComments = useCallback(async (startIndex: number) => {
     try {

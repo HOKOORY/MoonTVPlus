@@ -41,6 +41,7 @@ import { getVideoResolutionFromM3u8, processImageUrl } from '@/lib/utils';
 import EpisodeSelector from '@/components/EpisodeSelector';
 import PageLayout from '@/components/PageLayout';
 import DoubanComments from '@/components/DoubanComments';
+import { useEnableComments } from '@/hooks/useEnableComments';
 
 // 扩展 HTMLVideoElement 类型以支持 hls 属性
 declare global {
@@ -60,6 +61,7 @@ interface WakeLockSentinel {
 function PlayPageClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const enableComments = useEnableComments();
 
   // -----------------------------------------------------------------------------
   // 状态变量（State）
@@ -597,13 +599,17 @@ function PlayPageClient() {
       try {
         // 在销毁前从弹幕插件读取最新配置并保存
         if (danmakuPluginRef.current?.option && artPlayerRef.current.storage) {
+          // 获取当前弹幕设置的快照，避免循环引用
+          const currentDanmakuSettings = danmakuSettingsRef.current;
+          const danmakuPluginOption = danmakuPluginRef.current.option;
+          
           const currentSettings = {
-            ...danmakuSettingsRef.current,
-            opacity: danmakuPluginRef.current.option.opacity || danmakuSettingsRef.current.opacity,
-            fontSize: danmakuPluginRef.current.option.fontSize || danmakuSettingsRef.current.fontSize,
-            speed: danmakuPluginRef.current.option.speed || danmakuSettingsRef.current.speed,
-            marginTop: (danmakuPluginRef.current.option.margin && danmakuPluginRef.current.option.margin[0]) ?? danmakuSettingsRef.current.marginTop,
-            marginBottom: (danmakuPluginRef.current.option.margin && danmakuPluginRef.current.option.margin[1]) ?? danmakuSettingsRef.current.marginBottom,
+            ...currentDanmakuSettings,
+            opacity: danmakuPluginOption.opacity || currentDanmakuSettings.opacity,
+            fontSize: danmakuPluginOption.fontSize || currentDanmakuSettings.fontSize,
+            speed: danmakuPluginOption.speed || currentDanmakuSettings.speed,
+            marginTop: (danmakuPluginOption.margin && danmakuPluginOption.margin[0]) ?? currentDanmakuSettings.marginTop,
+            marginBottom: (danmakuPluginOption.margin && danmakuPluginOption.margin[1]) ?? currentDanmakuSettings.marginBottom,
           };
 
           // 保存到 localStorage 和 art.storage
@@ -901,63 +907,71 @@ function PlayPageClient() {
       setSkipConfig(newConfig);
       if (!newConfig.enable && !newConfig.intro_time && !newConfig.outro_time) {
         await deleteSkipConfig(currentSourceRef.current, currentIdRef.current);
-        artPlayerRef.current.setting.update({
-          name: '跳过片头片尾',
-          html: '跳过片头片尾',
-          switch: skipConfigRef.current.enable,
-          onSwitch: function (item: any) {
-            const newConfig = {
-              ...skipConfigRef.current,
-              enable: !item.switch,
-            };
-            handleSkipConfigChange(newConfig);
-            return !item.switch;
-          },
-        });
-        artPlayerRef.current.setting.update({
-          name: '设置片头',
-          html: '设置片头',
-          icon: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="5" cy="12" r="2" fill="#ffffff"/><path d="M9 12L17 12" stroke="#ffffff" stroke-width="2"/><path d="M17 6L17 18" stroke="#ffffff" stroke-width="2"/></svg>',
-          tooltip:
-            skipConfigRef.current.intro_time === 0
-              ? '设置片头时间'
-              : `${formatTime(skipConfigRef.current.intro_time)}`,
-          onClick: function () {
-            const currentTime = artPlayerRef.current?.currentTime || 0;
-            if (currentTime > 0) {
-              const newConfig = {
-                ...skipConfigRef.current,
-                intro_time: currentTime,
-              };
-              handleSkipConfigChange(newConfig);
-              return `${formatTime(currentTime)}`;
-            }
-          },
-        });
-        artPlayerRef.current.setting.update({
-          name: '设置片尾',
-          html: '设置片尾',
-          icon: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M7 6L7 18" stroke="#ffffff" stroke-width="2"/><path d="M7 12L15 12" stroke="#ffffff" stroke-width="2"/><circle cx="19" cy="12" r="2" fill="#ffffff"/></svg>',
-          tooltip:
-            skipConfigRef.current.outro_time >= 0
-              ? '设置片尾时间'
-              : `-${formatTime(-skipConfigRef.current.outro_time)}`,
-          onClick: function () {
-            const outroTime =
-              -(
-                artPlayerRef.current?.duration -
-                artPlayerRef.current?.currentTime
-              ) || 0;
-            if (outroTime < 0) {
-              const newConfig = {
-                ...skipConfigRef.current,
-                outro_time: outroTime,
-              };
-              handleSkipConfigChange(newConfig);
-              return `-${formatTime(-outroTime)}`;
-            }
-          },
-        });
+        
+        // 安全地更新播放器设置，仅在播放器存在时执行
+        if (artPlayerRef.current && artPlayerRef.current.setting) {
+          try {
+            artPlayerRef.current.setting.update({
+              name: '跳过片头片尾',
+              html: '跳过片头片尾',
+              switch: skipConfigRef.current.enable,
+              onSwitch: function (item: any) {
+                const newConfig = {
+                  ...skipConfigRef.current,
+                  enable: !item.switch,
+                };
+                handleSkipConfigChange(newConfig);
+                return !item.switch;
+              },
+            });
+            artPlayerRef.current.setting.update({
+              name: '设置片头',
+              html: '设置片头',
+              icon: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="5" cy="12" r="2" fill="#ffffff"/><path d="M9 12L17 12" stroke="#ffffff" stroke-width="2"/><path d="M17 6L17 18" stroke="#ffffff" stroke-width="2"/></svg>',
+              tooltip:
+                skipConfigRef.current.intro_time === 0
+                  ? '设置片头时间'
+                  : `${formatTime(skipConfigRef.current.intro_time)}`,
+              onClick: function () {
+                const currentTime = artPlayerRef.current?.currentTime || 0;
+                if (currentTime > 0) {
+                  const newConfig = {
+                    ...skipConfigRef.current,
+                    intro_time: currentTime,
+                  };
+                  handleSkipConfigChange(newConfig);
+                  return `${formatTime(currentTime)}`;
+                }
+              },
+            });
+            artPlayerRef.current.setting.update({
+              name: '设置片尾',
+              html: '设置片尾',
+              icon: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M7 6L7 18" stroke="#ffffff" stroke-width="2"/><path d="M7 12L15 12" stroke="#ffffff" stroke-width="2"/><circle cx="19" cy="12" r="2" fill="#ffffff"/></svg>',
+              tooltip:
+                skipConfigRef.current.outro_time >= 0
+                  ? '设置片尾时间'
+                  : `-${formatTime(-skipConfigRef.current.outro_time)}`,
+              onClick: function () {
+                const outroTime =
+                  -(
+                    artPlayerRef.current?.duration -
+                    artPlayerRef.current?.currentTime
+                  ) || 0;
+                if (outroTime < 0) {
+                  const newConfig = {
+                    ...skipConfigRef.current,
+                    outro_time: outroTime,
+                  };
+                  handleSkipConfigChange(newConfig);
+                  return `-${formatTime(-outroTime)}`;
+                }
+              },
+            });
+          } catch (settingErr) {
+            console.warn('更新播放器设置失败:', settingErr);
+          }
+        }
       } else {
         await saveSkipConfig(
           currentSourceRef.current,
@@ -1828,7 +1842,7 @@ function PlayPageClient() {
       window.removeEventListener('beforeunload', handleBeforeUnload);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [currentEpisodeIndex, detail, artPlayerRef.current]);
+  }, [currentEpisodeIndex, detail]);
 
   // 清理定时器
   useEffect(() => {
@@ -2231,15 +2245,20 @@ function PlayPageClient() {
                 ? '设置片头时间'
                 : `${formatTime(skipConfigRef.current.intro_time)}`,
             onClick: function () {
-              const currentTime = artPlayerRef.current?.currentTime || 0;
-              if (currentTime > 0) {
-                const newConfig = {
-                  ...skipConfigRef.current,
-                  intro_time: currentTime,
-                };
-                handleSkipConfigChange(newConfig);
-                return `${formatTime(currentTime)}`;
+              // 安全地获取当前播放时间，避免循环依赖
+              const player = artPlayerRef.current;
+              if (player && player.currentTime) {
+                const currentTime = player.currentTime || 0;
+                if (currentTime > 0) {
+                  const newConfig = {
+                    ...skipConfigRef.current,
+                    intro_time: currentTime,
+                  };
+                  handleSkipConfigChange(newConfig);
+                  return `${formatTime(currentTime)}`;
+                }
               }
+              return '';
             },
           },
           {
@@ -2251,19 +2270,21 @@ function PlayPageClient() {
                 ? '设置片尾时间'
                 : `-${formatTime(-skipConfigRef.current.outro_time)}`,
             onClick: function () {
-              const outroTime =
-                -(
-                  artPlayerRef.current?.duration -
-                  artPlayerRef.current?.currentTime
-                ) || 0;
-              if (outroTime < 0) {
-                const newConfig = {
-                  ...skipConfigRef.current,
-                  outro_time: outroTime,
-                };
-                handleSkipConfigChange(newConfig);
-                return `-${formatTime(-outroTime)}`;
+              // 安全地获取播放器时长和当前时间，避免循环依赖
+              const player = artPlayerRef.current;
+              if (player && player.duration && player.currentTime) {
+                const outroTime =
+                  -(player.duration - player.currentTime) || 0;
+                if (outroTime < 0) {
+                  const newConfig = {
+                    ...skipConfigRef.current,
+                    outro_time: outroTime,
+                  };
+                  handleSkipConfigChange(newConfig);
+                  return `-${formatTime(-outroTime)}`;
+                }
               }
+              return '';
             },
           },
         ],
@@ -2496,7 +2517,7 @@ function PlayPageClient() {
       console.error('创建播放器失败:', err);
       setError('播放器初始化失败');
     }
-  }, [Artplayer, Hls, videoUrl, loading, blockAdEnabled]);
+  }, [videoUrl, loading, blockAdEnabled, currentEpisodeIndex, detail]);
 
   // 当组件卸载时清理定时器、Wake Lock 和播放器资源
   useEffect(() => {
@@ -3283,7 +3304,7 @@ function PlayPageClient() {
         </div>
 
         {/* 豆瓣评论区域 */}
-        {videoDoubanId !== 0 && (
+        {videoDoubanId !== 0 && enableComments && (
           <div className='mt-6 px-4'>
             <div className='bg-white/50 dark:bg-gray-800/50 backdrop-blur-sm rounded-xl border border-gray-200/50 dark:border-gray-700/50 overflow-hidden'>
               {/* 标题 */}
