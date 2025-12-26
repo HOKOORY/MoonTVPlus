@@ -18,7 +18,8 @@ const VIDEOINFO_CACHE: Map<string, VideoInfoCacheEntry> = new Map();
 
 export interface MetaInfo {
   folders: {
-    [folderName: string]: {
+    [key: string]: {
+      folderName: string; // 原始文件夹名称
       tmdb_id: number;
       title: string;
       poster_path: string | null;

@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 import { getAuthInfoFromCookie } from '@/lib/auth';
 import { getConfig } from '@/lib/config';
+import { generateFolderKey } from '@/lib/crypto';
 import { db } from '@/lib/db';
 import { OpenListClient } from '@/lib/openlist.client';
 import {
@@ -188,6 +189,15 @@ async function performScan(
     let existingCount = 0;
     let errorCount = 0;
 
+    // 收集已存在的 key，用于冲突检测
+    const existingKeys = new Set<string>(Object.keys(metaInfo.folders));
+
+    // 创建文件夹名到 key 的映射（用于查找已存在的文件夹）
+    const folderNameToKey = new Map<string, string>();
+    for (const [key, info] of Object.entries(metaInfo.folders)) {
+      folderNameToKey.set(info.folderName, key);
+    }
+
     for (let i = 0; i < folders.length; i++) {
       const folder = folders[i];
 
@@ -195,10 +205,14 @@ async function performScan(
       updateScanTaskProgress(taskId, i + 1, folders.length, folder.name);
 
       // 如果是立即扫描（不清空 metainfo），且文件夹已存在，跳过
-      if (!clearMetaInfo && metaInfo.folders[folder.name]) {
+      if (!clearMetaInfo && folderNameToKey.has(folder.name)) {
         existingCount++;
         continue;
       }
+
+      // 生成文件夹的 key
+      const folderKey = generateFolderKey(folder.name, existingKeys);
+      existingKeys.add(folderKey);
 
       try {
         // 解析文件夹名称，提取季度信息和年份
@@ -221,6 +235,7 @@ async function performScan(
 
           // 基础信息
           const folderInfo: any = {
+            folderName: folder.name, // 保存原始文件夹名称
             tmdb_id: result.id,
             title: result.title || result.name || folder.name,
             poster_path: result.poster_path,
@@ -275,11 +290,12 @@ async function performScan(
             }
           }
 
-          metaInfo.folders[folder.name] = folderInfo;
+          metaInfo.folders[folderKey] = folderInfo;
           newCount++;
         } else {
           // 记录失败的文件夹
-          metaInfo.folders[folder.name] = {
+          metaInfo.folders[folderKey] = {
+            folderName: folder.name, // 保存原始文件夹名称
             tmdb_id: 0,
             title: folder.name,
             poster_path: null,
@@ -298,7 +314,8 @@ async function performScan(
       } catch (error) {
         console.error(`[OpenList Refresh] 处理文件夹失败: ${folder.name}`, error);
         // 记录失败的文件夹
-        metaInfo.folders[folder.name] = {
+        metaInfo.folders[folderKey] = {
+          folderName: folder.name, // 保存原始文件夹名称
           tmdb_id: 0,
           title: folder.name,
           poster_path: null,

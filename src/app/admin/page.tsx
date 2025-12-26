@@ -2959,7 +2959,7 @@ const OpenListConfigComponent = ({
     });
   };
 
-  const handleDeleteVideo = async (folder: string, title: string) => {
+  const handleDeleteVideo = async (key: string, title: string) => {
     // 显示确认对话框，直接在 onConfirm 中执行删除操作
     showAlert({
       type: 'warning',
@@ -2971,7 +2971,7 @@ const OpenListConfigComponent = ({
           const response = await fetch('/api/openlist/delete', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ folder }),
+            body: JSON.stringify({ key }),
           });
 
           if (!response.ok) {
@@ -3295,7 +3295,7 @@ const OpenListConfigComponent = ({
                             {video.failed ? '立即纠错' : '纠错'}
                           </button>
                           <button
-                            onClick={() => handleDeleteVideo(video.folder, video.title)}
+                            onClick={() => handleDeleteVideo(video.id, video.title)}
                             className={buttonStyles.dangerSmall}
                           >
                             删除
@@ -3331,7 +3331,7 @@ const OpenListConfigComponent = ({
         <CorrectDialog
           isOpen={correctDialogOpen}
           onClose={() => setCorrectDialogOpen(false)}
-          folder={selectedVideo.folder}
+          videoKey={selectedVideo.id}
           currentTitle={selectedVideo.title}
           onCorrect={handleCorrectSuccess}
         />

@@ -125,16 +125,10 @@ export async function GET(request: NextRequest) {
     const allVideos = Object.entries(metaInfo.folders)
       .filter(([, info]) => includeFailed || !info.failed) // 根据参数过滤失败的视频
       .map(
-        ([folderName, info]) => {
-          // 构建 id：如果是第二季及以后，id 也要包含季度信息
-          let videoId = folderName;
-          if (info.season_number && info.season_number > 1 && info.season_name) {
-            videoId = `${folderName} ${info.season_name}`;
-          }
-
+        ([key, info]) => {
           return {
-            id: videoId,
-            folder: folderName,
+            id: key,
+            folder: info.folderName,
             tmdbId: info.tmdb_id,
             title: info.title,
             poster: getTMDBImageUrl(info.poster_path),

@@ -63,8 +63,8 @@ export default function PrivateLibraryPage() {
   };
 
   const handleVideoClick = (video: Video) => {
-    // 跳转到播放页面
-    router.push(`/play?source=openlist&id=${encodeURIComponent(video.folder)}`);
+    // 跳转到播放页面，使用 id（key）而不是 folder
+    router.push(`/play?source=openlist&id=${encodeURIComponent(video.id)}`);
   };
 
   return (
@@ -106,7 +106,7 @@ export default function PrivateLibraryPage() {
               {videos.map((video) => (
                 <VideoCard
                   key={video.id}
-                  id={video.folder}
+                  id={video.id}
                   source='openlist'
                   title={video.title}
                   poster={video.poster}

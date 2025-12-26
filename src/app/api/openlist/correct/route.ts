@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
     const {
-      folder,
+      key,
       tmdbId,
       title,
       posterPath,
@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
       seasonName,
     } = body;
 
-    if (!folder || !tmdbId) {
+    if (!key || !tmdbId) {
       return NextResponse.json(
         { error: '缺少必要参数' },
         { status: 400 }
@@ -97,8 +97,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // 检查 key 是否存在
+    if (!metaInfo.folders[key]) {
+      return NextResponse.json(
+        { error: '视频不存在' },
+        { status: 404 }
+      );
+    }
+
+    // 保留原始文件夹名称
+    const folderName = metaInfo.folders[key].folderName;
+
     // 更新视频信息
-    metaInfo.folders[folder] = {
+    metaInfo.folders[key] = {
+      folderName: folderName,
       tmdb_id: tmdbId,
       title: title,
       poster_path: posterPath,

@@ -35,7 +35,7 @@ interface TMDBSeason {
 interface CorrectDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  folder: string;
+  videoKey: string;
   currentTitle: string;
   onCorrect: () => void;
 }
@@ -43,7 +43,7 @@ interface CorrectDialogProps {
 export default function CorrectDialog({
   isOpen,
   onClose,
-  folder,
+  videoKey,
   currentTitle,
   onCorrect,
 }: CorrectDialogProps) {
@@ -181,7 +181,7 @@ export default function CorrectDialog({
       }
 
       const body: any = {
-        folder,
+        key: videoKey,
         tmdbId: finalTmdbId,
         title: finalTitle,
         posterPath: season?.poster_path || result.poster_path,
